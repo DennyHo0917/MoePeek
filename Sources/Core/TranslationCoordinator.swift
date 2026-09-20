@@ -167,6 +167,49 @@ final class TranslationCoordinator {
         }
     }
 
+    /// How a silent-OCR attempt ended: toast on success, panel on failure, nothing on cancel.
+    enum SilentOCROutcome: Sendable, Equatable {
+        case copied
+        case cancelled
+        case failed
+    }
+
+    /// Triggered by the silent-OCR shortcut: screen capture → OCR → clipboard. No popup.
+    /// Success stays silent apart from the caller's toast; failures surface the panel with
+    /// the error so a dead-looking shortcut is never left unexplained.
+    @discardableResult
+    func ocrToClipboard() async -> SilentOCROutcome {
+        let requestToken = beginAction()
+        guard permissionManager.isScreenRecordingGranted else {
+            phase = .active
+            sourceText = ""
+            globalError = String(localized: "Screen recording permission not granted. Open Settings to enable it.")
+            return .failed
+        }
+
+        do {
+            let text = try await captureOCR()
+            guard !Task.isCancelled, requestToken == actionToken else {
+                return .cancelled
+            }
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return .cancelled }
+            NSPasteboard.general.clearContents()
+            guard NSPasteboard.general.setString(trimmed, forType: .string) else { return .cancelled }
+            return .copied
+        } catch OCRError.captureCancelled {
+            return .cancelled
+        } catch is CancellationError {
+            return .cancelled
+        } catch {
+            guard requestToken == actionToken else { return .cancelled }
+            phase = .active
+            sourceText = ""
+            globalError = String(localized: "OCR failed: \(error.localizedDescription)")
+            return .failed
+        }
+    }
+
     /// Read clipboard text and translate directly.
     func translateClipboard() async {
         if Defaults[.captureRichText],
