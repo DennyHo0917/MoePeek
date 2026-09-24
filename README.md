@@ -42,7 +42,8 @@
 | Bing Translate | Baidu | Anthropic | *(macOS 15+, on-device)* |
 | Youdao Translate | NiuTrans | DeepSeek | |
 | | Caiyun | OpenRouter | |
-| | DeepLX | 智谱 GLM | |
+| | DeepLX | Requesty | |
+| | | 智谱 GLM | |
 | | | Ollama (local) | |
 | | | LM Studio (local) | |
 

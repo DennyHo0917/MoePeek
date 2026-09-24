@@ -43,7 +43,8 @@
 | Bing 翻译 | 百度翻译 | Anthropic | *（macOS 15+，离线可用）* |
 | 有道翻译 | 小牛翻译 | DeepSeek | |
 | | 彩云小译 | OpenRouter | |
-| | DeepLX | 智谱 GLM | |
+| | DeepLX | Requesty | |
+| | | 智谱 GLM | |
 | | | Ollama（本地） | |
 | | | LM Studio（本地） | |
 
