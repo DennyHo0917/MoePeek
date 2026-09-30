@@ -287,6 +287,11 @@ enum SwapLanguagesShortcut {
 // MARK: - User Defaults Keys
 
 extension Defaults.Keys {
+    // Optional HTTP CONNECT proxy for Google Translate.
+    static let googleProxyEnabled = Key<Bool>("provider_google_proxyEnabled", default: false)
+    static let googleProxyHost = Key<String>("provider_google_proxyHost", default: "127.0.0.1")
+    static let googleProxyPort = Key<String>("provider_google_proxyPort", default: "7890")
+
     static let targetLanguage = Key<String>("targetLanguage", default: "zh-Hans")
     static let favoriteTargetLanguages = Key<[String]>(
         "favoriteTargetLanguages",
