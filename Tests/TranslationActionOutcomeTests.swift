@@ -272,9 +272,10 @@ import Testing
     }
 
     @Test func silentOCRCopiesTextToClipboardWithoutPresenting() async {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("sentinel", forType: .string)
-        let coordinator = makeCoordinator(captureOCR: { "  recognized text  " })
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.setString("sentinel", forType: .string)
+        let coordinator = makeCoordinator(captureOCR: { "  recognized text  " }, ocrPasteboard: pasteboard)
 
         let outcome = await coordinator.ocrToClipboard()
 
@@ -282,20 +283,74 @@ import Testing
         expectIdle(coordinator)
         #expect(coordinator.globalError == nil)
         #expect(coordinator.sourceText.isEmpty)
-        #expect(NSPasteboard.general.string(forType: .string) == "recognized text")
+        #expect(pasteboard.string(forType: .string) == "recognized text")
     }
 
     @Test func silentOCRCancellationPreservesIdleWithoutTouchingClipboard() async {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("sentinel", forType: .string)
-        let coordinator = makeCoordinator(captureOCR: { throw OCRError.captureCancelled })
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.setString("sentinel", forType: .string)
+        let coordinator = makeCoordinator(captureOCR: { throw OCRError.captureCancelled }, ocrPasteboard: pasteboard)
 
         let outcome = await coordinator.ocrToClipboard()
 
         #expect(outcome == .cancelled)
         expectIdle(coordinator)
         #expect(coordinator.globalError == nil)
-        #expect(NSPasteboard.general.string(forType: .string) == "sentinel")
+        #expect(pasteboard.string(forType: .string) == "sentinel")
+    }
+
+    enum SilentOCRClipboardInterruption: CaseIterable, Sendable {
+        case none
+        case cancellation
+        case newerAction
+    }
+
+    @Test(arguments: SilentOCRClipboardInterruption.allCases)
+    func silentOCRWaitsForCancelledCaptureRestoration(_ interruption: SilentOCRClipboardInterruption) async {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.setString("original clipboard", forType: .string)
+
+        var finishRestoration: CheckedContinuation<Void, Never>?
+        let captureTask = Task { @MainActor in
+            await ClipboardGrabber.withStableAccess(to: pasteboard) { clipboard -> Bool? in
+                await withCheckedContinuation { finishRestoration = $0 }
+                // A simulated copy completes its restoration even after cancellation.
+                clipboard.clearContents()
+                return clipboard.setString("original clipboard", forType: .string)
+            }
+        }
+        while finishRestoration == nil { await Task.yield() }
+        captureTask.cancel()
+
+        var captureFinished = false
+        let coordinator = makeCoordinator(captureOCR: {
+            captureFinished = true
+            return "recognized text"
+        }, ocrPasteboard: pasteboard)
+        let ocrTask = Task { await coordinator.ocrToClipboard() }
+        while !captureFinished { await Task.yield() }
+
+        switch interruption {
+        case .none:
+            break
+        case .cancellation:
+            ocrTask.cancel()
+        case .newerAction:
+            coordinator.prepareInputMode()
+        }
+
+        finishRestoration?.resume()
+        #expect(await captureTask.value == true)
+        let outcome = await ocrTask.value
+        if interruption == .none {
+            #expect(outcome == .copied)
+            #expect(pasteboard.string(forType: .string) == "recognized text")
+        } else {
+            #expect(outcome == .cancelled)
+            #expect(pasteboard.string(forType: .string) == "original clipboard")
+        }
     }
 
     @Test func silentOCRErrorsRemainPresentable() async {
@@ -319,7 +374,8 @@ import Testing
         screenRecordingGranted: Bool = true,
         grabSelection: @escaping @MainActor () async -> RichSourceDocument? = { nil },
         captureOCR: @escaping @MainActor () async throws -> String = { throw OCRError.captureCancelled },
-        resolveSmart: @escaping @MainActor () async -> SmartTranslationResult = { .cancelled }
+        resolveSmart: @escaping @MainActor () async -> SmartTranslationResult = { .cancelled },
+        ocrPasteboard: NSPasteboard = .general
     ) -> TranslationCoordinator {
         let provider = TestTranslationProvider()
         let registry = TranslationProviderRegistry(
@@ -338,7 +394,8 @@ import Testing
             registry: registry,
             grabSelection: grabSelection,
             captureOCR: captureOCR,
-            resolveSmart: resolveSmart
+            resolveSmart: resolveSmart,
+            ocrPasteboard: ocrPasteboard
         )
     }
 

@@ -273,9 +273,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Silent OCR: copy recognized text to the clipboard; confirm with a small toast.
     func performSilentOCR() {
-        cancelSmartTranslation()
         Task { @MainActor [weak self] in
             guard let self else { return }
+            await self.cancelSmartTranslationAndWait()
+            guard !Task.isCancelled else { return }
             switch await self.coordinator.ocrToClipboard() {
             case .copied:
                 self.copyToastController.show(message: String(localized: "Copied"))
