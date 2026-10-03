@@ -1,0 +1,43 @@
+name: API Route macOS validation
+
+on:
+  push:
+    branches: [api-route-validation]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-tests:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 3abe2c4bc602e707dbf7bd62101c32b286b39df3
+      - name: Install the repository's pinned Tuist
+        uses: jdx/mise-action@v2
+        with:
+          install: true
+      - name: Configure local ad-hoc signing
+        run: |
+          cat > Configurations/Signing.xcconfig <<'EOF'
+          MOEPEEK_CODE_SIGN_STYLE = Manual
+          MOEPEEK_CODE_SIGN_IDENTITY = -
+          MOEPEEK_DEVELOPMENT_TEAM =
+          EOF
+      - name: Resolve packages and generate the project
+        run: tuist install && tuist generate --no-open
+      - name: Build the app and run MoePeekTests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -workspace MoePeek.xcworkspace \
+            -scheme MoePeek \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -resultBundlePath build/API-Route-Tests.xcresult \
+            CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= \
+            VALIDATE_STRINGS_FILES_WHILE_COPYING=NO \
+            | tee /tmp/moepeek-test.log
