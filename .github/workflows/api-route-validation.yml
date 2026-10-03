@@ -26,6 +26,8 @@ jobs:
           MOEPEEK_CODE_SIGN_STYLE = Manual
           MOEPEEK_CODE_SIGN_IDENTITY = -
           MOEPEEK_DEVELOPMENT_TEAM =
+          // RFC 8032 public test vector, used only for test-host initialization.
+          SPARKLE_ED_PUBLIC_KEY = 11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=
           EOF
       - name: Resolve packages and generate the project
         run: tuist install && tuist generate --no-open
