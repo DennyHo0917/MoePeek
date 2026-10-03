@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 import Testing
@@ -268,6 +269,49 @@ import Testing
         #expect(recognitionFailureOutcome.shouldPresent)
         expectActive(recognitionFailureCoordinator)
         #expect(recognitionFailureCoordinator.globalError != nil)
+    }
+
+    @Test func silentOCRCopiesTextToClipboardWithoutPresenting() async {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("sentinel", forType: .string)
+        let coordinator = makeCoordinator(captureOCR: { "  recognized text  " })
+
+        let outcome = await coordinator.ocrToClipboard()
+
+        #expect(outcome == .copied)
+        expectIdle(coordinator)
+        #expect(coordinator.globalError == nil)
+        #expect(coordinator.sourceText.isEmpty)
+        #expect(NSPasteboard.general.string(forType: .string) == "recognized text")
+    }
+
+    @Test func silentOCRCancellationPreservesIdleWithoutTouchingClipboard() async {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("sentinel", forType: .string)
+        let coordinator = makeCoordinator(captureOCR: { throw OCRError.captureCancelled })
+
+        let outcome = await coordinator.ocrToClipboard()
+
+        #expect(outcome == .cancelled)
+        expectIdle(coordinator)
+        #expect(coordinator.globalError == nil)
+        #expect(NSPasteboard.general.string(forType: .string) == "sentinel")
+    }
+
+    @Test func silentOCRErrorsRemainPresentable() async {
+        let permissionCoordinator = makeCoordinator(screenRecordingGranted: false)
+        let permissionOutcome = await permissionCoordinator.ocrToClipboard()
+
+        #expect(permissionOutcome == .failed)
+        expectActive(permissionCoordinator)
+        #expect(permissionCoordinator.globalError != nil)
+
+        let failureCoordinator = makeCoordinator(captureOCR: { throw OCRError.captureReadFailed })
+        let failureOutcome = await failureCoordinator.ocrToClipboard()
+
+        #expect(failureOutcome == .failed)
+        expectActive(failureCoordinator)
+        #expect(failureCoordinator.globalError != nil)
     }
 
     private func makeCoordinator(

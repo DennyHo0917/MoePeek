@@ -162,6 +162,7 @@ extension KeyboardShortcuts.Name {
     static let smartTranslation = Self("smartTranslation")
     static let translateSelection = Self("translateSelection", default: .init(.d, modifiers: .option))
     static let ocrScreenshot = Self("ocrScreenshot", default: .init(.s, modifiers: .option))
+    static let silentOCR = Self("silentOCR")
     static let inputTranslation = Self("inputTranslation", default: .init(.a, modifiers: .option))
     static let clipboardTranslation = Self("clipboardTranslation", default: .init(.v, modifiers: .option))
     static let swapLanguages: Self = {
@@ -231,6 +232,7 @@ enum SwapLanguagesShortcut {
         .smartTranslation,
         .translateSelection,
         .ocrScreenshot,
+        .silentOCR,
         .inputTranslation,
         .clipboardTranslation,
     ]
